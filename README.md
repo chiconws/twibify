@@ -72,7 +72,7 @@ theme):
 ## Install
 
 The image is [`firmware/twibify-v1.0.bin`](firmware/twibify-v1.0.bin) (uImage format,
-6,796,372 bytes). The bootloader takes the image **without the 64-byte header**, so strip
+6,251,604 bytes). The bootloader takes the image **without the 64-byte header**, so strip
 it and send via TFTP in disaster mode:
 
 ```sh

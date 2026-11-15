@@ -71,7 +71,7 @@ tema escuro):
 ## Instalação
 
 A imagem é [`firmware/twibify-v1.0.bin`](firmware/twibify-v1.0.bin) (formato uImage,
-6.796.372 bytes). O bootloader aceita a imagem **sem os 64 bytes do cabeçalho**, então
+6.251.604 bytes). O bootloader aceita a imagem **sem os 64 bytes do cabeçalho**, então
 remova e envie por TFTP no disaster mode:
 
 ```sh
