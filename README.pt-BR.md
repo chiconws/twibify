@@ -36,7 +36,8 @@ Twibify muda só isso e adiciona o que faltava:
 ### SSH
 
 - dropbear estático na porta 22, iniciado pelo `rcS`;
-- **senha inicial: `chiconws`** (root) — troque na página IoT;
+- **o SSH vem desligado**; um switch na página IoT liga, e para ligar é preciso definir uma
+  senha (mín. 8). A imagem mantém a senha do console (UART), `chiconws`, para recuperação;
 - chaves públicas: cole uma na página; ela fica no `cfm` e é aplicada em
   `/var/root/.ssh/authorized_keys` no boot;
 - autenticação por senha e por chave funcionam juntas.
@@ -80,7 +81,7 @@ python3 -c "d=open('twibify-v1.0.bin','rb').read(); open('payload.bin','wb').wri
 python3 tools/tftp_put.py 192.168.1.6 payload.bin --name payload.bin
 ```
 
-Para entrar em disaster mode: desliga, segura o **reset**, liga e mantém por ~5 s. O
+Para entrar em disaster mode: desliga, segura o **reset**, liga e mantém por ~15 s. O
 bootloader imprime `Entry disaster mode` e sobe um servidor TFTP em `192.168.1.6`.
 
 **Rollback**: o mesmo procedimento com o `twibi_fast_1.1.11.bin` oficial (veja

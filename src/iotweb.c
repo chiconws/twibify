@@ -327,11 +327,74 @@ static void api_iot(int fd, const char *body) {
     send_json(fd, 200, "{\"ok\":true}");
 }
 
+static int ssh_enabled(void) {
+    char b[64] = "";
+    FILE *p = popen("cfm Get ssh.enabled 2>/dev/null", "r");
+    if (p) {
+        size_t n = fread(b, 1, sizeof(b) - 1, p);
+        b[n] = 0;
+        pclose(p);
+    }
+    rstrip(b);
+    if (strstr(b, "failed")) return 0;
+    return atoi(b) == 1;
+}
+
 static void api_ssh_get(int fd) {
     char buf[256] = "";
-    int has_key = 0;
+    int has_key = 0, en = ssh_enabled();
     if (read_file(AUTH_KEYS, buf, sizeof(buf)) > 0 && strstr(buf, "ssh-")) has_key = 1;
-    send_json(fd, 200, has_key ? "{\"key\":true}" : "{\"key\":false}");
+    send_json(fd, 200, has_key
+        ? (en ? "{\"enabled\":true,\"key\":true}" : "{\"enabled\":false,\"key\":true}")
+        : (en ? "{\"enabled\":true,\"key\":false}" : "{\"enabled\":false,\"key\":false}"));
+}
+
+static void api_ssh_toggle(int fd, const char *body, int on) {
+    if (!on) {
+        cfm_set("ssh.enabled", "0");
+        (void)!system("killall dropbear 2>/dev/null");
+        send_json(fd, 200, "{\"ok\":true}");
+        return;
+    }
+    {
+        char pw[128], salt[9], hash[64];
+        if (json_string(body, "password", pw, sizeof(pw)) < 0 || !valid_password(pw)) {
+            send_json(fd, 400, "{\"error\":\"defina uma senha (minimo 8, sem espaco) para ligar o SSH\"}");
+            return;
+        }
+        random_salt(salt, 8);
+        md5_crypt(pw, salt, hash);
+        {
+            char sh[8192], sout[8192], *sl, *sn, *so = sout;
+            if (read_file("/etc/shadow", sh, sizeof(sh)) >= 0) {
+                int f = 0;
+                sl = sh;
+                while (sl && *sl) {
+                    sn = strchr(sl, '\n');
+                    if (sn) { *sn = 0; sn++; }
+                    if (!f && !strncmp(sl, "root:", 5)) {
+                        char *c2 = strchr(sl + 5, ':');
+                        so += sprintf(so, "root:%s%s", hash, c2 ? c2 : ":14319::::::");
+                        f = 1;
+                    } else {
+                        so += sprintf(so, "%s", sl);
+                    }
+                    *so++ = '\n';
+                    sl = sn;
+                }
+                *so = 0;
+                if (f) write_file("/etc/shadow", sout, 0644);
+            }
+        }
+        if (set_root_hash(hash) < 0) {
+            send_json(fd, 500, "{\"error\":\"falha ao gravar /etc/passwd\"}");
+            return;
+        }
+        cfm_set("ssh.pwd", hash);
+        cfm_set("ssh.enabled", "1");
+        (void)!system("(dropbear -p 22 -b /etc_ro/issue -P /var/run/dropbear.pid >/dev/null 2>&1 &)");
+        send_json(fd, 200, "{\"ok\":true}");
+    }
 }
 
 static void api_ssh_password(int fd, const char *body) {
@@ -405,6 +468,8 @@ static int handle(int fd, const char *req, const char *body, const char *method,
     if (!strcmp(path, "/api/ssh")) return api_ssh_get(fd), 0;
     if (!strcmp(path, "/api/iot") && !strcmp(method, "POST")) return api_iot(fd, body), 0;
     if (!strcmp(path, "/api/ssh/password") && !strcmp(method, "POST")) return api_ssh_password(fd, body), 0;
+    if (!strcmp(path, "/api/ssh/enable") && !strcmp(method, "POST")) return api_ssh_toggle(fd, body, 1), 0;
+    if (!strcmp(path, "/api/ssh/disable") && !strcmp(method, "POST")) return api_ssh_toggle(fd, body, 0), 0;
     if (!strcmp(path, "/api/ssh/key") && !strcmp(method, "POST")) return api_ssh_key(fd, body, 0), 0;
     if (!strcmp(path, "/api/ssh/key") && !strcmp(method, "DELETE")) return api_ssh_key(fd, body, 1), 0;
     send_json(fd, 404, "{\"error\":\"rota desconhecida\"}");

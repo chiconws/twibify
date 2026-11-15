@@ -32,7 +32,7 @@ reconstruindo a uImage com o checksum do rootfs (`tools/mkimage_twibi.py`).
 monitor &                        # daemons originais (cfm, netctrl, httpd, ucloud, ...)
 |
 +-- (sleep 15) cfm Set cwmpd.en 0 ... ucloud.en 1   # o CMF sobrevive ao flash
-+-- dropbear + host key
++-- host key; dropbear só se cfm ssh.enabled=1
 +-- (sleep 20) token -> /webroot/iot.token ; iotweb &
 +-- (sleep 30) apply_ssh ; while true: sleep 30; apply_ssh; iot-clients apply
 +-- (loop 10s) watchdog do iotweb

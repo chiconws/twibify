@@ -36,7 +36,9 @@ changes only that, and adds what was missing:
 ### SSH
 
 - static dropbear on port 22, started by `rcS`;
-- **initial password: `chiconws`** (root) — change it on the IoT page;
+- **SSH is off by default**; a switch on the IoT page enables it, and enabling it requires
+  setting a password (min 8 chars). The image keeps a console (UART) password, `chiconws`,
+  for recovery;
 - public keys: paste one on the page; it is stored in `cfm` and applied to
   `/var/root/.ssh/authorized_keys` at boot;
 - password auth and key auth work together.
@@ -80,7 +82,7 @@ python3 -c "d=open('twibify-v1.0.bin','rb').read(); open('payload.bin','wb').wri
 python3 tools/tftp_put.py 192.168.1.6 payload.bin --name payload.bin
 ```
 
-To enter disaster mode: power off, hold **reset**, power on and keep it for ~5 s. The
+To enter disaster mode: power off, hold **reset**, power on and keep it for ~15 s. The
 bootloader prints `Entry disaster mode` and starts a TFTP server on `192.168.1.6`.
 
 **Rollback**: the same procedure with the official `twibi_fast_1.1.11.bin` (see

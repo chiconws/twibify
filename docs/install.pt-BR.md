@@ -22,7 +22,7 @@ para rollback.
 ## Gravar
 
 1. Desligue o aparelho.
-2. Segure o **reset**, ligue **ainda segurando** e mantenha por ~5 s; solte. O console
+2. Segure o **reset**, ligue **ainda segurando** e mantenha por ~15 s; solte. O console
    imprime `Entry disaster mode` e o bootloader sobe o TFTP em `192.168.1.6`.
 3. Coloque o PC em `192.168.1.0/24` (ex.: `192.168.1.5/24`).
 4. Remova os 64 bytes do cabeçalho e envie:
@@ -49,8 +49,8 @@ Ele reinicia sozinho (~60–90 s até a webui responder).
 
 - A LAN mantém o endereço que tinha (o CFM sobrevive). O login é a senha de admin
   existente.
-- SSH: `ssh root@<ip>` com a senha inicial **`chiconws`**. Troque na página **IoT** da
-  webui, ou cadastre uma chave pública lá.
+- SSH: **desligado por padrão**. Abra a página **IoT**, defina uma senha e clique em
+  **Ligar SSH**. O console UART continua com `chiconws`.
 - A página IoT fica em "Configurações avançadas → IoT".
 
 ## Se não bootar

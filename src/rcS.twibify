@@ -17,7 +17,10 @@ if [ ! -f /etc/dropbear/dropbear_ed25519_host_key ]; then
     dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key >/dev/null 2>&1
 fi
 chmod 600 /etc/dropbear/dropbear_ed25519_host_key 2>/dev/null
-dropbear -p 22 -b /etc_ro/issue -P /var/run/dropbear.pid >/dev/null 2>&1 &
+ssh_en=$(cfm Get ssh.enabled 2>/dev/null | grep -v -i failed)
+if [ "$ssh_en" = "1" ]; then
+    dropbear -p 22 -b /etc_ro/issue -P /var/run/dropbear.pid >/dev/null 2>&1 &
+fi
 
 apply_ssh() {
     pw=$(cfm Get ssh.pwd 2>/dev/null | grep -v -i failed)
@@ -62,6 +65,7 @@ while true; do
     sleep 30
     apply_ssh
     /usr/sbin/iot-clients apply >/dev/null 2>&1
+    [ "$(cfm Get ssh.enabled 2>/dev/null | grep -v -i failed)" = "1" ] || killall dropbear 2>/dev/null
     grep -q iotweb /proc/[0-9]*/comm 2>/dev/null || /usr/sbin/iotweb >/dev/null 2>&1 &
 done
 ) >/dev/null 2>&1 &

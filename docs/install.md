@@ -21,7 +21,7 @@ password stay as they are. Keep a copy of `twibi_fast_1.1.11.bin` (official) for
 ## Flash
 
 1. Power off the device.
-2. Hold **reset**, power on **still holding**, keep it for ~5 s, release. The console
+2. Hold **reset**, power on **still holding**, keep it for ~15 s, release. The console
    prints `Entry disaster mode` and the bootloader serves TFTP on `192.168.1.6`.
 3. Put the PC on `192.168.1.0/24` (e.g. `192.168.1.5/24`).
 4. Strip the 64-byte header and send:
@@ -48,8 +48,8 @@ It reboots by itself (~60–90 s until the web UI answers).
 
 - LAN keeps the address it had (the CFM survives). The login is the existing admin
   password.
-- SSH: `ssh root@<ip>` with **`chiconws`** (initial password). Change it on the
-  **IoT** page in the web UI, or add a public key there.
+- SSH: **off by default**. Open the **IoT** page, set a password and click **Ligar SSH**
+  (the page is in Portuguese). The UART console still uses `chiconws`.
 - The IoT page is in "Configurações avançadas → IoT".
 
 ## If it does not boot

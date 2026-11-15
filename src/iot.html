@@ -62,8 +62,14 @@
   </section>
 
   <section>
-    <h2>Senha do SSH (root)</h2>
-    <label>Nova senha (mínimo 8 caracteres)</label>
+    <h2>SSH (root)</h2>
+    <p class="dica">O SSH vem <b>desligado</b>. Para ligar, defina uma senha abaixo.</p>
+    <div class="row" style="margin-top:0">
+      <span class="pill" id="sshstate">desligado</span>
+      <button id="sshtoggle" class="sec">Ligar SSH</button>
+      <span class="msg" id="msgssh"></span>
+    </div>
+    <label>Senha (mínimo 8 caracteres)</label>
     <input type="password" id="pw" autocomplete="new-password" placeholder="nova senha">
     <div class="row">
       <button id="savepw">Salvar senha</button>
@@ -158,6 +164,7 @@
   }).then(function (s) {
     if (s.mem_total_kb) sysinfo(s);
     document.getElementById('keystate').textContent = s.ssh_key ? 'Chave cadastrada.' : 'Nenhuma chave cadastrada.';
+    loadSsh().catch(function () {});
     return load();
   }).catch(function (e) {
     document.getElementById('clients').innerHTML =
@@ -166,6 +173,36 @@
   });
 
   document.getElementById('reload').onclick = load;
+
+  function updateSsh(en, key) {
+    var st = document.getElementById('sshstate');
+    st.textContent = en ? 'ligado' : 'desligado';
+    st.className = 'pill' + (en ? ' on' : '');
+    document.getElementById('sshtoggle').textContent = en ? 'Desligar SSH' : 'Ligar SSH';
+    document.getElementById('sshtoggle').className = en ? 'danger' : 'sec';
+    window.__sshEnabled = en;
+    if (typeof key !== 'undefined') document.getElementById('keystate').textContent = key ? 'Chave cadastrada.' : 'Nenhuma chave cadastrada.';
+  }
+
+  function loadSsh() {
+    return api('GET', '/api/ssh').then(function (s) { updateSsh(!!s.enabled, !!s.key); });
+  }
+
+  document.getElementById('sshtoggle').onclick = function () {
+    var en = !!window.__sshEnabled;
+    if (en) {
+      api('POST', '/api/ssh/disable').then(function () { updateSsh(false); say('msgssh', 'SSH desligado', true); })
+        .catch(function (e) { say('msgssh', e.message, false); });
+      return;
+    }
+    var pw = document.getElementById('pw').value;
+    if (pw.length < 8) { say('msgssh', 'defina uma senha (min. 8) para ligar o SSH', false); return; }
+    api('POST', '/api/ssh/enable', { password: pw }).then(function () {
+      document.getElementById('pw').value = '';
+      updateSsh(true);
+      say('msgssh', 'SSH ligado', true);
+    }).catch(function (e) { say('msgssh', e.message, false); });
+  };
 
   document.getElementById('savepw').onclick = function () {
     var pw = document.getElementById('pw').value;

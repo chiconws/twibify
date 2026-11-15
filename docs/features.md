@@ -5,7 +5,8 @@
 ## SSH (dropbear)
 
 - starts at boot from `rcS`; host key generated on first boot;
-- **initial root password `chiconws`**;
+- **off by default**: the switch on the page enables it, and enabling requires a password
+  (min 8 chars). The UART console keeps `chiconws` for recovery;
 - change it on the IoT page (minimum 8 chars) — the hash is stored in `cfm ssh.pwd` and
   re-applied after `cfmd`/`netctrl` rewrite `/etc/passwd`;
 - paste one public key on the page; it goes to `cfm ssh.key` and is written to
@@ -79,7 +80,9 @@ written to `/webroot/iot.token` (only served to a logged-in web session):
 | `GET /api/status` | version, key state, RAM, thermal, uptime |
 | `GET /api/clients` | ARP clients + IoT flag |
 | `POST /api/iot` | `{"mac":"..","iot":true/false}` |
-| `GET /api/ssh` | whether a key is registered |
+| `GET /api/ssh` | `{"enabled":..,"key":..}` |
+| `POST /api/ssh/enable` | `{"password":".."}` — sets the password, starts dropbear |
+| `POST /api/ssh/disable` | stops dropbear (`ssh.enabled=0`) |
 | `POST /api/ssh/password` | `{"password":".."}` |
 | `POST /api/ssh/key` | `{"key":"ssh-ed25519 ..."}` |
 | `DELETE /api/ssh/key` | remove the key |

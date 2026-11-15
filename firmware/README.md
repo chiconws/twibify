@@ -4,7 +4,7 @@
 
 | File | Size | SHA-256 |
 |---|---|---|
-| `twibify-v1.0.bin` | 6,796,372 B | `170278540df7a19f2434fdd79793b65788e5f7905403295e74186928b423c137` |
+| `twibify-v1.0.bin` | 6,796,372 B | `028a4178da83b1c3f126a78ee655b98302aa2f28743af5c121dcdefec78a2de1` |
 
 Format: **uImage (64-byte header) + kernel (stock 1.1.11) + squashfs rootfs + trailer**,
 built by `tools/mkimage_twibi.py` with the rootfs checksum recomputed.
