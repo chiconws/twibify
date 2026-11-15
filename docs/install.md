@@ -52,6 +52,13 @@ It reboots by itself (~60–90 s until the web UI answers).
   (the page is in Portuguese). The UART console still uses `chiconws`.
 - The IoT page is in "Configurações avançadas → IoT".
 
+## Updating through the stock web UI
+
+The web UI's local upgrade can flash an image **only if it is ≤ ~5.3 MB** (the handler
+needs `2 × size + 2 MB` of free RAM, and the upload body is buffered). A 5.22 MB image was
+flashed successfully this way (`errcode 0`); the full Twibify image (6.25 MB) does not fit,
+so use disaster mode.
+
 ## If it does not boot
 
 The bootloader is intact — go back to disaster mode and flash the official image

@@ -53,6 +53,13 @@ Ele reinicia sozinho (~60–90 s até a webui responder).
   **Ligar SSH**. O console UART continua com `chiconws`.
 - A página IoT fica em "Configurações avançadas → IoT".
 
+## Atualizar pela webui original
+
+O upgrade local da webui grava **apenas imagens ≤ ~5,3 MB** (o handler precisa de
+`2 × tamanho + 2 MB` de RAM livre, e o corpo do upload fica no buffer). Uma imagem de
+5,22 MB subiu desse jeito (`errcode 0`); a imagem completa do Twibify (6,25 MB) não cabe,
+então use o disaster mode.
+
 ## Se não bootar
 
 O bootloader está intacto — volte ao disaster mode e grave a imagem oficial
