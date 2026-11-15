@@ -1,0 +1,1 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[16],{Zae3:function(t,e,o){"use strict";o.r(e);e.default={name:"Iot",render:function(){var t=this.$createElement;return t("iframe",{attrs:{src:"/iot.html?t="+Date.now()},staticStyle:{width:"100%",height:"calc(100vh - 96px)",border:"0",display:"block"}})}}}}]);

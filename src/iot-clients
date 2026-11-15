@@ -1,0 +1,102 @@
+#!/bin/sh
+# iot-clients - grupo IoT por MAC (vale para cabo e Wi-Fi, sem VLAN).
+#
+# Uso:
+#   iot-clients list              lista os MACs do grupo
+#   iot-clients add <mac> [nome]  inclui um cliente no grupo
+#   iot-clients del <mac>         remove um cliente do grupo
+#   iot-clients apply             (re)aplica as regras no iptables
+#   iot-clients status            mostra lista + regras
+#   iot-clients clients           clientes vistos agora (arp + leases)
+#
+# O grupo e' bloqueado para a internet (FORWARD br0 -> WAN) quando
+# iot.internet != 1. O bloqueio e' por MAC de origem, entao funciona
+# igual para cliente no cabo (mesmo atras de switch) e no Wi-Fi.
+
+CHAIN=CH_iot
+KEY=iot.clients
+
+macs() {
+    cfm Get "$KEY" 2>/dev/null | grep -v -i "failed"
+}
+
+save() {
+    cfm Set "$KEY" "$1" >/dev/null 2>&1
+    return 0
+}
+
+normalize() {
+    echo "$1" | awk '{print tolower($0)}'
+}
+
+each_mac() {
+    for _m in $(macs); do echo "$_m"; done
+}
+
+internet_on() {
+    [ "$(cfm Get iot.internet 2>/dev/null | grep -v -i failed)" = "1" ]
+}
+
+apply() {
+    iptables -N "$CHAIN" 2>/dev/null
+    iptables -F "$CHAIN" 2>/dev/null
+    if ! internet_on; then
+        for m in $(macs); do
+            iptables -A "$CHAIN" -m mac --mac-source "$m" -j DROP 2>/dev/null
+        done
+    fi
+    if ! iptables -S FORWARD 2>/dev/null | grep -q "j $CHAIN"; then
+        iptables -I FORWARD 1 -i br0 -j "$CHAIN" 2>/dev/null
+    fi
+}
+
+add() {
+    m=$(normalize "$1")
+    [ -n "$m" ] || { echo "uso: iot-clients add <mac>"; return 1; }
+    list=$(macs)
+    case " $list " in
+        *" $m "*) echo "$m ja esta no grupo" ;;
+        *) save "${list:+$list }$m"; apply; echo "$m incluido no grupo IoT" ;;
+    esac
+}
+
+del() {
+    m=$(normalize "$1")
+    [ -n "$m" ] || { echo "uso: iot-clients del <mac>"; return 1; }
+    out=""
+    for x in $(macs); do
+        [ "$x" = "$m" ] || out="${out:+$out }$x"
+    done
+    save "$out"
+    apply
+    echo "$m removido do grupo IoT"
+}
+
+case "$1" in
+    list)
+        each_mac
+        ;;
+    add)   shift; add "$@" ;;
+    del)   shift; del "$@" ;;
+    apply) apply; echo "regras aplicadas" ;;
+    status)
+        echo "== grupo IoT (MACs):"
+        each_mac | sed 's/^/  /'
+        echo "== internet do grupo: $(internet_on && echo LIGADA || echo BLOQUEADA)"
+        echo "== chain $CHAIN:"
+        iptables -vnL "$CHAIN" 2>/dev/null
+        ;;
+    clients)
+        # ARP: clientes vistos agora
+        echo "== ARP:"
+        sed -n '2,$p' /proc/net/arp | awk '{print $4, $1}'
+        # leases do dhcps, se existirem
+        for f in /var/dhcp.leases /tmp/dhcp.leases /var/lib/misc/dnsmasq.leases; do
+            [ -f "$f" ] && { echo "== leases ($f):"; cat "$f"; }
+        done
+        ;;
+    *)
+        echo "uso: $0 list|add <mac>|del <mac>|apply|status|clients"
+        exit 1
+        ;;
+esac

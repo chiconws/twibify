@@ -1,0 +1,67 @@
+# ---- Twibify: firmware paralelo (minimo) ----
+# desliga TR-069, OTA e o reboot das 3h; mantem o cloud (app) ligado
+(
+sleep 15
+cfm Set cwmpd.en 0
+cfm Set sys.itbupgrade.enable 0
+cfm Set sys.itbupgrade.url ""
+cfm Set sys.schedulereboot.enable 0
+cfm Set sched.reboot.enable 0
+cfm Set ucloud.en 1
+killall cwmpd 2>/dev/null
+) >/dev/null 2>&1 &
+
+# SSH (a senha/chave e aplicada depois: o cfmd reescreve /etc/passwd)
+mkdir -p /etc/dropbear
+if [ ! -f /etc/dropbear/dropbear_ed25519_host_key ]; then
+    dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key >/dev/null 2>&1
+fi
+chmod 600 /etc/dropbear/dropbear_ed25519_host_key 2>/dev/null
+dropbear -p 22 -b /etc_ro/issue -P /var/run/dropbear.pid >/dev/null 2>&1 &
+
+apply_ssh() {
+    pw=$(cfm Get ssh.pwd 2>/dev/null | grep -v -i failed)
+    [ -z "$pw" ] && pw='$1$chiconws$act1qXyCeSzI7IqyO6V4c0'
+    grep -q '^root:' /etc/passwd 2>/dev/null || echo "root:x:0:0:root:/var/root:/bin/sh" >> /etc/passwd
+    sed -i "s|^root:[^:]*:|root:$pw:|" /etc/passwd 2>/dev/null
+    grep -q '^root:' /etc/shadow 2>/dev/null || echo "root:x:14319::::::" >> /etc/shadow
+    sed -i "s|^root:[^:]*:|root:$pw:|" /etc/shadow 2>/dev/null
+    key=$(cfm Get ssh.key 2>/dev/null | grep -v -i failed)
+    if [ -n "$key" ]; then
+        mkdir -p /var/root/.ssh
+        echo "$key" > /var/root/.ssh/authorized_keys
+        chmod 700 /var/root/.ssh
+        chmod 600 /var/root/.ssh/authorized_keys
+    fi
+}
+
+# backend da pagina IoT/SSH (porta 8080) + token por boot
+(
+sleep 20
+tok=$(cat /proc/sys/kernel/random/uuid 2>/dev/null | md5sum | sed 's/ .*//')
+[ -z "$tok" ] && tok=$(date +%s)twibify
+echo "$tok" > /webroot/iot.token
+chmod 600 /webroot/iot.token
+/usr/sbin/iotweb >/dev/null 2>&1 &
+) >/dev/null 2>&1 &
+
+# watchdog do backend (10 s)
+(
+while true; do
+    sleep 10
+    grep -q iotweb /proc/[0-9]*/comm 2>/dev/null || /usr/sbin/iotweb >/dev/null 2>&1 &
+done
+) >/dev/null 2>&1 &
+
+# aplica senha/chave depois do cfmd e mantem reaplicando (junto com o IoT)
+(
+sleep 30
+apply_ssh
+/usr/sbin/iot-clients apply >/dev/null 2>&1
+while true; do
+    sleep 30
+    apply_ssh
+    /usr/sbin/iot-clients apply >/dev/null 2>&1
+    grep -q iotweb /proc/[0-9]*/comm 2>/dev/null || /usr/sbin/iotweb >/dev/null 2>&1 &
+done
+) >/dev/null 2>&1 &

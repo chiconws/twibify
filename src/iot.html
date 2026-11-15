@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IoT &amp; SSH - Twibify</title>
+<style>
+  :root {
+    --verde:#00a335; --verde2:#00d646;
+    --fundo:#1c1c1c; --card:#262626; --borda:#3a3a3a;
+    --texto:#e2e2e2; --fraco:#8f8f8f; --laranja:#fe6600;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 -apple-system,"Segoe UI",Roboto,sans-serif; color:var(--texto); background:var(--fundo); }
+  main { padding:14px 18px 40px; max-width:1000px; }
+  .status { display:flex; gap:20px; flex-wrap:wrap; background:var(--card); border:1px solid var(--borda); border-radius:8px; padding:10px 16px; margin-bottom:14px; font-size:13px; color:var(--texto); }
+  .status b { color:var(--fraco); font-weight:500; }
+  .status .m { color:var(--fraco); font-size:12px; }
+  section { background:var(--card); border:1px solid var(--borda); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
+  h2 { margin:0 0 10px; font-size:14px; font-weight:600; color:var(--texto); }
+  p.dica { margin:0 0 8px; color:var(--fraco); font-size:12px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:8px; border-bottom:1px solid var(--borda); }
+  th { color:var(--fraco); font-weight:500; font-size:12px; }
+  tr:last-child td { border-bottom:none; }
+  code { font:12px/1.3 ui-monospace,Consolas,monospace; color:#c9c9c9; }
+  label { display:block; font-size:12px; color:var(--fraco); margin:8px 0 4px; }
+  input[type=password], input[type=text], textarea {
+    width:100%; padding:8px 10px; border:1px solid var(--borda); border-radius:4px;
+    font:13px/1.4 inherit; background:#1f1f1f; color:var(--texto);
+  }
+  textarea { min-height:74px; resize:vertical; font-family:ui-monospace,Consolas,monospace; font-size:12px; }
+  button {
+    background:var(--verde); color:#fff; border:0; border-radius:4px;
+    height:32px; line-height:30px; padding:0 20px; font-size:14px; cursor:pointer;
+  }
+  button:hover { background:#00b93c; }
+  button.sec { background:#3a3a3a; color:var(--texto); }
+  button.sec:hover { background:#464646; }
+  button.danger { background:transparent; color:var(--laranja); border:1px solid var(--laranja); line-height:28px; }
+  button.danger:hover { background:rgba(254,102,0,.12); }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+  .msg { font-size:12px; margin-left:4px; }
+  .ok { color:var(--verde2); } .err { color:#ff7043; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:12px; font-size:11px; background:#3a3a3a; color:#cfcfcf; }
+  .pill.on { background:rgba(0,163,53,.18); color:var(--verde2); }
+</style>
+</head>
+<body>
+<main>
+  <div class="status" id="sys"><span class="m">carregando status...</span></div>
+
+  <section>
+    <h2>Clientes</h2>
+    <p class="dica">Marque <b>IoT</b> para bloquear a internet do cliente (por MAC, vale para cabo e Wi-Fi).</p>
+    <table>
+      <thead><tr><th>IP</th><th>MAC</th><th>Grupo</th><th></th></tr></thead>
+      <tbody id="clients"><tr><td colspan="4" style="color:#8f8f8f">carregando...</td></tr></tbody>
+    </table>
+    <div class="row"><button class="sec" id="reload">Atualizar</button><span class="msg" id="msg1"></span></div>
+  </section>
+
+  <section>
+    <h2>Senha do SSH (root)</h2>
+    <label>Nova senha (mínimo 8 caracteres)</label>
+    <input type="password" id="pw" autocomplete="new-password" placeholder="nova senha">
+    <div class="row">
+      <button id="savepw">Salvar senha</button>
+      <span class="msg" id="msg2"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Chave pública SSH</h2>
+    <p class="dica">Cole uma chave (<code>ssh-ed25519 AAAA...</code>). Com chave cadastrada você pode usar só chave.</p>
+    <textarea id="key" placeholder="ssh-ed25519 AAAA... usuario@maquina"></textarea>
+    <div class="row">
+      <button id="savekey">Salvar chave</button>
+      <button class="danger" id="delkey">Remover chave</button>
+      <span class="msg" id="msg3"></span>
+    </div>
+    <p class="dica" id="keystate" style="margin-top:8px"></p>
+  </section>
+</main>
+<script>
+(function () {
+  var token = null, HOST = location.hostname;
+
+  function api(method, path, body) {
+    return fetch('http://' + HOST + ':8080' + path, {
+      method: method,
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        return j;
+      });
+    });
+  }
+
+  function say(id, text, ok) {
+    var el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'msg ' + (ok ? 'ok' : 'err');
+    setTimeout(function () { el.textContent = ''; }, 4000);
+  }
+
+  function renderClients(raw) {
+    var map = {}, list = [];
+    (raw || []).forEach(function (c) {
+      var e = map[c.mac];
+      if (!e) { e = map[c.mac] = { mac: c.mac, iot: c.iot, ips: [] }; list.push(e); }
+      if (e.ips.indexOf(c.ip) < 0) e.ips.push(c.ip);
+      if (c.iot) e.iot = true;
+    });
+    var tb = document.getElementById('clients');
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="4" style="color:#8f8f8f">nenhum cliente visto</td></tr>'; return; }
+    tb.innerHTML = list.map(function (c) {
+      return '<tr><td><code>' + c.ips.join(', ') + '</code></td><td><code>' + c.mac + '</code></td>' +
+             '<td><span class="pill ' + (c.iot ? 'on' : '') + '">' + (c.iot ? 'IoT' : 'LAN') + '</span></td>' +
+             '<td style="text-align:right"><button class="' + (c.iot ? 'sec' : '') + '" data-mac="' + c.mac + '" data-iot="' + (c.iot ? 1 : 0) + '">' +
+             (c.iot ? 'Tirar do IoT' : 'Marcar IoT') + '</button></td></tr>';
+    }).join('');
+    Array.prototype.forEach.call(tb.querySelectorAll('button'), function (b) {
+      b.onclick = function () {
+        var mac = b.getAttribute('data-mac'), iot = b.getAttribute('data-iot') === '0';
+        b.disabled = true;
+        api('POST', '/api/iot', { mac: mac, iot: iot }).then(load).catch(function (e) {
+          b.disabled = false; say('msg1', e.message, false);
+        });
+      };
+    });
+  }
+
+  function load() {
+    return api('GET', '/api/clients').then(renderClients).catch(function (e) {
+      document.getElementById('clients').innerHTML = '<tr><td colspan="4" class="err">' + e.message + '</td></tr>';
+    });
+  }
+
+  function sysinfo(s) {
+    var u = (s.mem_used_kb / 1024).toFixed(1), t = (s.mem_total_kb / 1024).toFixed(0);
+    var up = s.uptime_s || 0, h = Math.floor(up / 3600), m = Math.floor((up % 3600) / 60);
+    document.getElementById('sys').innerHTML =
+      '<span><b>Memória</b> ' + u + ' / ' + t + ' MB (' + s.mem_used_pct + '%)</span>' +
+      '<span><b>Térmico 2.4G</b> ' + s.thermal_2g + ' <span class="m">(ADC relativo)</span></span>' +
+      '<span><b>Térmico 5G</b> ' + s.thermal_5g + ' <span class="m">(ADC relativo)</span></span>' +
+      '<span><b>Uptime</b> ' + h + 'h' + m + 'm</span>';
+  }
+
+  fetch('/iot.token', { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
+    token = t.trim();
+    return fetch('http://' + HOST + ':8080/api/status', {
+      headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store'
+    }).then(function (r) { return r.json(); });
+  }).then(function (s) {
+    if (s.mem_total_kb) sysinfo(s);
+    document.getElementById('keystate').textContent = s.ssh_key ? 'Chave cadastrada.' : 'Nenhuma chave cadastrada.';
+    return load();
+  }).catch(function (e) {
+    document.getElementById('clients').innerHTML =
+      '<tr><td colspan="4" class="err">backend fora do ar, tentando de novo... (' + e.message + ')</td></tr>';
+    setTimeout(function () { location.reload(); }, 3000);
+  });
+
+  document.getElementById('reload').onclick = load;
+
+  document.getElementById('savepw').onclick = function () {
+    var pw = document.getElementById('pw').value;
+    api('POST', '/api/ssh/password', { password: pw }).then(function () {
+      document.getElementById('pw').value = '';
+      say('msg2', 'senha alterada', true);
+    }).catch(function (e) { say('msg2', e.message, false); });
+  };
+
+  document.getElementById('savekey').onclick = function () {
+    var k = document.getElementById('key').value.trim();
+    api('POST', '/api/ssh/key', { key: k }).then(function () {
+      document.getElementById('keystate').textContent = 'Chave cadastrada.';
+      say('msg3', 'chave salva', true);
+    }).catch(function (e) { say('msg3', e.message, false); });
+  };
+
+  document.getElementById('delkey').onclick = function () {
+    api('DELETE', '/api/ssh/key').then(function () {
+      document.getElementById('keystate').textContent = 'Nenhuma chave cadastrada.';
+      say('msg3', 'chave removida', true);
+    }).catch(function (e) { say('msg3', e.message, false); });
+  };
+})();
+</script>
+</body>
+</html>
